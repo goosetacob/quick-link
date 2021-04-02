@@ -1,8 +1,9 @@
 use headless_chrome::{Browser, Tab};
+use std::collections::HashMap;
 use std::sync::Arc;
 use url::Url;
 
-macro_rules! my_macro {
+macro_rules! spice_up {
     (
         struct $name:ident {
             $($field_name:ident: $field_type:ty,)*
@@ -18,16 +19,28 @@ macro_rules! my_macro {
                 vec![$(stringify!($field_name)),*]
                     .into_iter()
                     .map(|p| {
-                        if p.starts_with("r#") { p.trim_start_matches("r#") }
+                        if p.starts_with("r#") { p.trim_start_matches("r#")}
                         else { p }
                     })
                     .collect()
+            }
+
+            fn from_hashmap(hm: HashMap<&str, String>) -> $name {
+                let mut opd = $name::default();
+                for (&k, v) in hm.iter() {
+                  match k {
+                    $(stringify!($field_name) => { opd.$field_name = v.clone() }, )*
+                    "type" => { opd.r#type = v.clone() }, // TODO: edge case
+                    _ => { println!("unsupported open graph porperty: {}", k) }
+                  }
+                }
+                return opd;
             }
         }
     }
 }
 
-my_macro! {
+spice_up! {
     struct LinkPreview {
         title: String,
         r#type: String,
@@ -43,38 +56,30 @@ my_macro! {
     }
 }
 
-fn visit_link(link: Url) -> Result<LinkPreview, failure::Error> {
+fn visit_link(link: Url, og_props: Vec<&'static str>) -> Result<LinkPreview, failure::Error> {
     println!("visiting: {}", link.as_str());
-    let mut link_preview_data = LinkPreview::default();
+    let mut link_preview_data = HashMap::new();
     let browser = Browser::default()?;
 
     let tab = browser.wait_for_initial_tab()?;
     tab.navigate_to(link.as_str())?;
     tab.wait_until_navigated()?;
 
-    match parse_title(&tab) {
-        Ok(title) => link_preview_data.title = title,
-        Err(e) => println!("{}", e),
-    };
-
-    match parse_image(&tab) {
-        Ok(img) => link_preview_data.image = img,
-        Err(e) => println!("{}", e),
+    for ogp_key in og_props {
+        match parse_util(
+            &tab,
+            format!("meta[property=\"og:{}\"]", ogp_key),
+            format!("content"),
+        ) {
+            Err(e) => {
+                println!("no value for {}: {}", ogp_key, e);
+                continue;
+            }
+            Ok(ogp_value) => link_preview_data.insert(ogp_key, ogp_value),
+        };
     }
 
-    return Ok(link_preview_data);
-}
-
-fn parse_title(tab: &Arc<Tab>) -> Result<String, failure::Error> {
-    tab.get_title()
-}
-
-fn parse_image(tab: &Arc<Tab>) -> Result<String, failure::Error> {
-    parse_util(
-        tab,
-        String::from("meta[property=\"og:image\"]"),
-        String::from("content"),
-    )
+    return Ok(LinkPreview::from_hashmap(link_preview_data));
 }
 
 fn parse_util(tab: &Arc<Tab>, selector: String, prop: String) -> Result<String, failure::Error> {
@@ -99,17 +104,10 @@ fn parse_util(tab: &Arc<Tab>, selector: String, prop: String) -> Result<String, 
     Ok(value)
 }
 
-fn main() {
-    let open_graph_props = LinkPreview::get_field_names();
-    for og_prop in open_graph_props {
-        println!("{:#?}", og_prop);
-    }
+fn main() -> Result<(), failure::Error> {
+    let valid_url = Url::parse("https://www.youtube.com/watch?v=09fNvoQMlGw")?;
 
-    match Url::parse("https://www.youtube.com/watch?v=09fNvoQMlGw") {
-        Ok(link) => match visit_link(link) {
-            Ok(data) => println!("open-graph data: {:#?}", data),
-            Err(e) => println!("error parsing open graph data: {:?}", e),
-        },
-        Err(e) => println!("error parsing url: {:?}", e),
-    }
+    let open_graph_props = LinkPreview::get_field_names();
+    let open_graph_data = visit_link(valid_url, open_graph_props)?;
+    Ok(println!("open-graph data: {:#?}", open_graph_data))
 }

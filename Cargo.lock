@@ -476,8 +476,6 @@ version = "0.1.0"
 dependencies = [
  "failure",
  "headless_chrome",
- "serde",
- "serde_json",
  "url 2.2.1",
 ]
 
