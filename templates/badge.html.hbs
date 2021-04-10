@@ -1,0 +1,48 @@
+<style>
+	:root {
+		--badge-width: 300px;
+		--badge-text-padding: 15px;
+		--badge-radius: 15px;
+	}
+	.grid {
+		display: grid;
+		grid-template-columns: 1fr;
+	}
+	#top {
+		border-radius: var(--badge-radius) var(--badge-radius) 0px 0px;
+		width: calc(var(--badge-width) + (var(--badge-text-padding) * 2));
+	}
+	#bottom {
+		color: white;
+		background-color: #121212;
+		border-radius: 0px 0px var(--badge-radius) var(--badge-radius);
+		padding: 0px var(--badge-text-padding);
+		width: var(--badge-width);
+	}
+	#title {
+		font-size: 15px;
+		margin-bottom: 0px;
+	}
+	#description {
+		font-size: 15px;
+		margin: 5px 0px;
+	}
+	#url {
+		font-size: 15px;
+		margin-top: 0px;
+		display: block;
+		width: calc(var(--badge-width) - (var(--badge-text-padding) * 2));
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+</style>
+
+<div class="grid">
+	<img id="top" src="{{ image }}" alt="{{ title }}">
+	<div id="bottom">
+		<h2 id="title">{{ title }}</h2>
+		<p id="description">{{ description }}</p>
+		<p id="url">&#x1f517; {{ url }}</p>
+	</div>
+</div>

@@ -3,6 +3,7 @@ use rocket::http::RawStr;
 use rocket::request::FromFormValue;
 use rocket::response::status::BadRequest;
 use rocket_contrib::json::Json;
+use rocket_contrib::templates::Template;
 use url::Url;
 
 mod open_graph;
@@ -22,7 +23,6 @@ impl<'r> FromFormValue<'r> for Link {
             Ok(dvalue) => dvalue,
             Err(_) => return Err(BadRequest(Some(String::from("failed decode url")))),
         };
-        println!("-----{}", decoded_value);
         match Url::parse(&decoded_value) {
             Ok(url) => Ok(Self { url }),
             Err(_) => Err(BadRequest(Some(String::from("failed to parse url")))),
@@ -38,6 +38,17 @@ fn opengraph(link: Link) -> Result<Json<open_graph::LinkPreview>, BadRequest<Str
     }
 }
 
+#[get("/badge?<link>")]
+fn badge(link: Link) -> Result<Template, BadRequest<String>> {
+    match open_graph::collect_data(&link.url) {
+        Ok(data) => Ok(Template::render("badge", &data)),
+        Err(e) => Err(BadRequest(Some(e.to_string()))),
+    }
+}
+
 fn main() {
-    rocket::ignite().mount("/", routes![opengraph]).launch();
+    rocket::ignite()
+        .attach(Template::fairing())
+        .mount("/", routes![opengraph, badge])
+        .launch();
 }
